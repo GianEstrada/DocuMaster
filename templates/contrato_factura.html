@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="styles.css">
+  <title>Contrato de Arrendamiento y Factura Proforma</title>
+</head>
+<body>
+  <h1>CONTRATO DE ARRENDAMIENTO Y FACTURA PROFORMA</h1>
+  <div class="meta">
+    <div><p><b>Folio:</b> {{ orden.folio }}</p><p><b>Fecha de Emisión:</b> {{ orden.fecha_emision }}</p><p><b>Lugar:</b> {{ orden.lugar }}</p></div>
+    <div><p><b>Arrendador:</b> {{ orden.arrendador_nombre }}</p><p><b>RFC:</b> {{ orden.arrendador_rfc }}</p></div>
+  </div>
+  <h2>Datos del Arrendatario (Cliente)</h2>
+  <div class="meta">
+    <div><p><b>Cliente / Razón Social:</b> {{ orden.cliente_razon_social }}</p><p><b>Representante:</b> {{ orden.representante }}</p></div>
+    <div><p><b>Domicilio Fiscal:</b> {{ orden.domicilio_fiscal }}</p><p><b>RFC Cliente:</b> {{ orden.cliente_rfc }}</p></div>
+  </div>
+  <h2>Condiciones del Arrendamiento</h2>
+  <p><b>Vigencia del contrato:</b> {{ orden.tiempo_arrendamiento }} meses</p>
+  <p><b>Periodo de arrendamiento:</b> Del {{ orden.fecha_inicio }} al {{ orden.fecha_fin }}</p>
+  <h2>Desglose de Costos (Facturación)</h2>
+  <table><thead><tr><th>Concepto / Descripción</th><th>Cant.</th><th>Precio Unitario<br>(Mensual)</th><th>Meses</th><th>Importe</th></tr></thead>
+  <tbody><tr><td>{{ orden.producto }}</td><td>{{ orden.cantidad }}</td><td>${{ "%.2f"|format(orden.precio_unitario) }} MXN</td><td>{{ orden.tiempo_arrendamiento }}</td><td>${{ "%.2f"|format(orden.subtotal) }} MXN</td></tr></tbody></table>
+  <div class="totals"><p><b>Subtotal:</b> ${{ "%.2f"|format(orden.subtotal) }} MXN</p><p><b>IVA (16%):</b> ${{ "%.2f"|format(orden.iva) }} MXN</p><p class="grand-total"><b>TOTAL A PAGAR:</b> ${{ "%.2f"|format(orden.total) }} MXN</p></div>
+  <h2>CLÁUSULAS DEL CONTRATO:</h2>
+  {% for clausula in orden.clausulas %}<p class="clause"><b>{{ clausula.numero }}. {{ clausula.titulo }}:</b> {{ clausula.contenido }}</p>{% endfor %}
+  <div class="signatures"><div>______________________________<br>{{ orden.arrendador_nombre }}<br>El Arrendador</div><div>______________________________<br>{{ orden.cliente_razon_social }}<br>El Arrendatario (Firma de conformidad)</div></div>
+</body>
+</html>
