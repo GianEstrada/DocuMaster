@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, QSettings
 from PyQt6.QtWidgets import (
     QDateEdit, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget,
@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self.root = root
         self.document_service = DocumentService(root)
         self.persistence = PersistenceService(root)
+        self.settings = QSettings("DocuMaster", "DocuMaster")
         self.clause_editors: list[ClauseEditor] = []
         self.setWindowTitle("DocuMaster")
         self.resize(1000, 760)
@@ -60,6 +61,7 @@ class MainWindow(QMainWindow):
     def build_ui(self):
         tabs = QTabWidget()
         tabs.addTab(self.general_tab(), "Datos generales")
+        tabs.addTab(self.landlord_tab(), "Arrendador")
         tabs.addTab(self.client_tab(), "Arrendatario")
         tabs.addTab(self.rental_tab(), "Arrendamiento y costos")
         tabs.addTab(self.clauses_tab(), "Cláusulas editables")
@@ -70,6 +72,29 @@ class MainWindow(QMainWindow):
         self.preview_button.clicked.connect(self.generate)
         layout.addWidget(self.preview_button)
         self.setCentralWidget(container)
+
+    def landlord_tab(self):
+        tab = QWidget()
+        form = QFormLayout(tab)
+        self.landlord_name = self.text_field(
+            self.settings.value("landlord/name", "NOMBRE DEL ARRENDADOR", type=str)
+        )
+        self.landlord_rfc = self.text_field(
+            self.settings.value("landlord/rfc", "XAXX010101000", type=str)
+        )
+        self.landlord_name.editingFinished.connect(self.save_landlord_settings)
+        self.landlord_rfc.editingFinished.connect(self.save_landlord_settings)
+        form.addRow("Razón social / nombre:", self.landlord_name)
+        form.addRow("RFC:", self.landlord_rfc)
+        note = QLabel("Estos dos datos se guardan localmente para la próxima apertura.")
+        note.setWordWrap(True)
+        form.addRow(note)
+        return tab
+
+    def save_landlord_settings(self):
+        self.settings.setValue("landlord/name", self.landlord_name.text().strip())
+        self.settings.setValue("landlord/rfc", self.landlord_rfc.text().strip().upper())
+        self.settings.sync()
 
     def general_tab(self):
         tab = QWidget()
@@ -173,6 +198,8 @@ class MainWindow(QMainWindow):
             folio=self.folio.text(),
             fecha_emision=self.qdate_to_date(self.fecha_emision),
             lugar=self.lugar.text(),
+            arrendador_nombre=self.landlord_name.text(),
+            arrendador_rfc=self.landlord_rfc.text(),
             cliente_razon_social=self.client_name.text(),
             representante=self.representative.text(),
             domicilio_fiscal=self.address.text(),
@@ -193,6 +220,7 @@ class MainWindow(QMainWindow):
 
     def generate(self):
         try:
+            self.save_landlord_settings()
             order = self.build_order()
             html = self.document_service.render(order)
             pdf_path = self.root / "storage" / "expedientes" / str(order.fecha_emision.year) / order.folio / "contrato_factura.pdf"

@@ -12,3 +12,5 @@ python app.py
 ```
 
 Microsoft Edge se usa como motor principal para imprimir el HTML/CSS con fidelidad visual. WeasyPrint queda como segunda opción y ReportLab como último fallback de contingencia. Edge debe estar instalado en Windows; normalmente ya viene incluido.
+
+La pestaña **Arrendador** permite editar la razón social/nombre y RFC que aparecen en el contrato. Esos dos valores se guardan localmente mediante la configuración de Windows (`QSettings`) para reutilizarlos en la siguiente apertura; los datos del cliente y del contrato no se guardan en esa configuración.
