@@ -4,13 +4,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
-DEFAULT_CLAUSES = [
-    ("OBJETO", "El ARRENDADOR otorga en arrendamiento al ARRENDATARIO los bienes descritos en el desglose superior por el periodo especificado."),
-    ("PRECIO Y PAGO", "El ARRENDATARIO se obliga a pagar la cantidad total descrita en la presente orden/factura, incluyendo el 16% de IVA correspondiente."),
-    ("RESPONSABILIDAD", "El ARRENDATARIO será responsable del buen uso de los Baños y Casetas portátiles. Cualquier daño por negligencia será facturado adicionalmente."),
-]
-
-
 class ClausulaSchema(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

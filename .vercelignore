@@ -1,8 +1,0 @@
-.venv
-.git
-storage
-__pycache__
-docs
-documaster/views
-app.py
-requirements-desktop.txt
