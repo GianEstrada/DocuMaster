@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocuMaster</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fa; color: #3e4b5b; }
+    header { background: #183b63; padding: 12px 16px; display: flex; gap: 10px; align-items: center; }
+    header a, header button { color: #fff; background: #2e6da4; border: 0; padding: 12px 18px; border-radius: 6px; font-size: 16px; text-decoration: none; cursor: pointer; }
+    header form { margin-left: auto; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    fieldset { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; margin: 0 0 16px; padding: 16px; }
+    legend { color: #28679e; font-weight: bold; padding: 0 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: bold; }
+    input, textarea { font: inherit; font-weight: normal; font-size: 17px; padding: 12px; border: 1px solid #c8d1da; border-radius: 6px; width: 100%; }
+    textarea { min-height: 90px; resize: vertical; }
+    .invalid { border-color: #b00020; background: #fff5f6; }
+    .totals { text-align: right; font-size: 17px; line-height: 1.8; }
+    .totals .grand { font-size: 22px; font-weight: bold; color: #183b63; }
+    .clause { border: 1px solid #dde3ea; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #fafbfc; }
+    .clause-actions { display: flex; gap: 8px; margin-top: 8px; }
+    button.secondary { background: #eaf0f5; color: #183b63; border: 1px solid #c8d1da; padding: 10px 14px; border-radius: 6px; font-size: 15px; cursor: pointer; }
+    button.primary { width: 100%; background: #2e6da4; color: #fff; border: 0; padding: 18px; border-radius: 8px; font-size: 19px; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    #errors { background: #fdecea; color: #b00020; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: none; }
+    #errors ul { margin: 6px 0 0; padding-left: 20px; }
+    .hint { font-size: 13px; color: #6b7a8a; margin: 8px 0 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/contratos">Historial</a>
+    <form method="post" action="/logout"><button type="submit">Salir</button></form>
+  </header>
+  <main>
+    <div id="errors" role="alert"></div>
+
+    <fieldset>
+      <legend>Datos generales</legend>
+      <div class="grid">
+        <label>Folio<input name="folio" required></label>
+        <label>Fecha de emisión<input type="date" name="fecha_emision" value="{{ hoy }}" required></label>
+        <label>Lugar<input name="lugar" value="" required></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Arrendador</legend>
+      <div class="grid">
+        <label>Razón social / nombre<input name="arrendador_nombre" value="{{ arrendador.nombre }}" required></label>
+        <label>RFC<input name="arrendador_rfc" value="{{ arrendador.rfc }}" required autocapitalize="characters"></label>
+      </div>
+      <p class="hint">Estos dos datos se guardan para la próxima vez.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Arrendatario (cliente)</legend>
+      <div class="grid">
+        <label>Cliente / razón social<input name="cliente_razon_social" required></label>
+        <label>Representante<input name="representante" required></label>
+        <label>Domicilio fiscal<input name="domicilio_fiscal" required></label>
+        <label>RFC cliente<input name="cliente_rfc" required autocapitalize="characters"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Arrendamiento y costos</legend>
+      <div class="grid">
+        <label>Producto / descripción<input name="producto" value="Arrendamiento de Baño Portátil Estándar con Mantenimiento" required></label>
+        <label>Cantidad<input type="number" name="cantidad" min="1" step="1" value="1" inputmode="numeric" required></label>
+        <label>Precio unitario mensual (MXN)<input type="number" name="precio_unitario" min="0.01" step="0.01" value="0" inputmode="decimal" required></label>
+        <label>Meses<input type="number" name="tiempo_arrendamiento" min="0.01" step="0.01" value="1" inputmode="decimal" required></label>
+        <label>Fecha inicial<input type="date" name="fecha_inicio" value="{{ hoy }}" required></label>
+        <label>Fecha final<input type="date" name="fecha_fin" value="{{ hoy }}" required></label>
+      </div>
+      <div class="totals">
+        <div>Subtotal: <span id="subtotal">$0.00</span> MXN</div>
+        <div>IVA (16%): <span id="iva">$0.00</span> MXN</div>
+        <div class="grand">TOTAL A PAGAR: <span id="total">$0.00</span> MXN</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Cláusulas del contrato</legend>
+      <div id="clauses"></div>
+      <button type="button" class="secondary" id="add-clause">+ Agregar cláusula</button>
+    </fieldset>
+
+    <button type="button" class="primary" id="submit">Validar y generar contrato</button>
+  </main>
+
+  <script>
+    const defaultClauses = {{ clausulas | tojson }};
+    const field = (name) => document.querySelector(`[name="${name}"]`);
+    const money = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cents = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+    function recalc() {
+      const subtotal = cents(Number(field("cantidad").value) * Number(field("precio_unitario").value) * Number(field("tiempo_arrendamiento").value));
+      const iva = cents(subtotal * 0.16);
+      document.getElementById("subtotal").textContent = money(subtotal);
+      document.getElementById("iva").textContent = money(iva);
+      document.getElementById("total").textContent = money(cents(subtotal + iva));
+    }
+    ["cantidad", "precio_unitario", "tiempo_arrendamiento"].forEach((n) => field(n).addEventListener("input", recalc));
+
+    const clausesBox = document.getElementById("clauses");
+
+    function addClause(title, content) {
+      const box = document.createElement("div");
+      box.className = "clause";
+      const t = document.createElement("input");
+      t.placeholder = "Título";
+      t.value = title;
+      t.dataset.role = "title";
+      const c = document.createElement("textarea");
+      c.placeholder = "Contenido";
+      c.value = content;
+      c.dataset.role = "content";
+      const actions = document.createElement("div");
+      actions.className = "clause-actions";
+      const make = (label, handler) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "secondary";
+        b.textContent = label;
+        b.addEventListener("click", handler);
+        actions.appendChild(b);
+      };
+      make("↑ Subir", () => box.previousElementSibling && clausesBox.insertBefore(box, box.previousElementSibling));
+      make("↓ Bajar", () => box.nextElementSibling && clausesBox.insertBefore(box.nextElementSibling, box));
+      make("Eliminar", () => {
+        if (clausesBox.children.length > 1) box.remove();
+        else alert("Debe conservar al menos una cláusula.");
+      });
+      box.append(t, c, actions);
+      clausesBox.appendChild(box);
+    }
+    defaultClauses.forEach(([title, content]) => addClause(title, content));
+    document.getElementById("add-clause").addEventListener("click", () => addClause("NUEVA CLÁUSULA", "Escriba aquí el contenido de la cláusula."));
+
+    function collect() {
+      const text = (n) => field(n).value.trim();
+      return {
+        folio: text("folio"),
+        fecha_emision: text("fecha_emision"),
+        lugar: text("lugar"),
+        arrendador_nombre: text("arrendador_nombre"),
+        arrendador_rfc: text("arrendador_rfc").toUpperCase(),
+        cliente_razon_social: text("cliente_razon_social"),
+        representante: text("representante"),
+        domicilio_fiscal: text("domicilio_fiscal"),
+        cliente_rfc: text("cliente_rfc").toUpperCase(),
+        producto: text("producto"),
+        cantidad: text("cantidad"),
+        precio_unitario: text("precio_unitario"),
+        tiempo_arrendamiento: text("tiempo_arrendamiento"),
+        fecha_inicio: text("fecha_inicio"),
+        fecha_fin: text("fecha_fin"),
+        clausulas: [...clausesBox.children].map((box, i) => ({
+          numero: i + 1,
+          titulo: box.querySelector('[data-role="title"]').value.trim(),
+          contenido: box.querySelector('[data-role="content"]').value.trim(),
+        })),
+      };
+    }
+
+    const errorsBox = document.getElementById("errors");
+    function showErrors(items) {
+      document.querySelectorAll(".invalid").forEach((el) => el.classList.remove("invalid"));
+      errorsBox.replaceChildren();
+      const title = document.createElement("strong");
+      title.textContent = "Revise los siguientes datos:";
+      const list = document.createElement("ul");
+      items.forEach(({ campo, mensaje }) => {
+        const li = document.createElement("li");
+        li.textContent = `${campo || "Datos"}: ${mensaje}`;
+        list.appendChild(li);
+        const el = field(campo);
+        if (el) el.classList.add("invalid");
+      });
+      errorsBox.append(title, list);
+      errorsBox.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function saveLandlord() {
+      const nombre = field("arrendador_nombre").value.trim();
+      const rfc = field("arrendador_rfc").value.trim().toUpperCase();
+      if (nombre.length < 2 || !rfc) return;
+      await fetch("/api/arrendador", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, rfc }),
+      }).catch(() => {});
+    }
+    ["arrendador_nombre", "arrendador_rfc"].forEach((n) => field(n).addEventListener("change", saveLandlord));
+
+    document.getElementById("submit").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      errorsBox.style.display = "none";
+      try {
+        const response = await fetch("/api/contratos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(collect()),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          window.location.href = data.url;
+        } else if (response.status === 401) {
+          window.location.href = "/login";
+        } else {
+          showErrors(data.errores || [{ campo: "", mensaje: data.error || "No se pudo guardar el contrato." }]);
+        }
+      } catch {
+        showErrors([{ campo: "", mensaje: "Sin conexión con el servidor." }]);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    recalc();
+  </script>
+</body>
+</html>
